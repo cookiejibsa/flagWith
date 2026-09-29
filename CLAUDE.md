@@ -54,6 +54,7 @@ Security 2, Front-end 1, Back-end 3. Security designs the data-protection and ac
 ## Commands
 
 ```bash
+docker compose up -d                  # local MySQL + Redis
 ./gradlew bootRun                     # run app
 ./gradlew build                       # compile + test + jar
 ./gradlew test                        # all tests (JUnit 5)
@@ -63,7 +64,7 @@ Security 2, Front-end 1, Back-end 3. Security designs the data-protection and ac
 
 ## Gotchas
 
-- JPA + MySQL driver are on the classpath but `application.yaml` has no `spring.datasource.*`. `bootRun` and `@SpringBootTest` (`contextLoads`) will fail to start until a datasource is configured (or tests get a test-scoped DB).
+- Local run needs MySQL (and Redis, once used): `docker compose up -d` starts both with the dev defaults that `application.yaml` reads (`DB_URL`/`DB_USERNAME`/`DB_PASSWORD` env vars override). Tests need no external services: `src/test/resources/application.yaml` points at in-memory H2 (MySQL mode), so MySQL-specific SQL is not covered by tests.
 - Spring Boot 4 splits test starters per module (`spring-boot-starter-data-jpa-test`, `spring-boot-starter-webmvc-test`); add matching test starters when adding new starters.
 
 ## Keeping this file current
