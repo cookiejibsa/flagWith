@@ -4,32 +4,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-Fresh Spring Boot scaffold (Spring Initializr): only `FlagWithApplication` and a `contextLoads` test exist. No domain code yet. `README.md` (Korean) is the concept doc; timeline and detailed stack are not decided.
+Spring Boot scaffold (Spring Initializr): only `FlagWithApplication` and a `contextLoads` test exist. No domain code yet. `README.md` (Korean, DSM 12기 인포 동아리 project) is the source of truth for product decisions; read it before designing features and follow it over this file if they disagree.
 
 ## Product
 
-flagWith is a GitHub-style, git-based team workspace that **CTF organizers** provision for participating teams. The customer is the organizer, not the participants. Accounts span three roles: organizer, contest, team.
+flagWith is a GitHub-style, git-based team workspace that **CTF organizers** provision for participating teams (Jeopardy format only). The customer is the organizer. It is a hosted SaaS: organizers sign up, create contests themselves (max 3 per account), and register teams; a workspace named after the team is created automatically. There is no host/participant account type: whoever created the CTF is its host, and accounts registered to a team are its participants. Login is by email.
+
+Decided (README):
+- **Custom git engine** (not built on existing OSS). **Web only** for the MVP; terminal git is v2.
+- **Files are paths, not folders.** Only files are stored; `/` in `file_path` renders as folders. Each file lives at (workspace, branch, problem, area, `file_path`) with area = problem files (read-only, host-provided) / team work / writeup. Path rules are in README; validate them server-side.
+- **Consent-based edits over WebSocket:** editing/deleting a file or deleting a branch needs approval from the other teammates who have it open (60s timeout, silence counts as rejection, team leader can force-apply). Branch merge needs only the leader. Create/move/copy/memo/solved-mark are immediate.
+- **Two independent pages**, workspace and timeline, both always in the nav (no automatic switch at contest end). The timeline is a finalized snapshot generated after the contest ends.
+- **Organizer dashboard** shows stats and activity metadata only, never code or memos. "Solved" is a team self-reported mark, not flag verification. Updated by polling.
 
 Invariants that shape the design:
-- **Team isolation:** a team can access only its own workspace. Every API request must check that the caller belongs to the target team (IDOR). This isolation is the main selling point because it blocks cross-team collaboration, so treat any authz gap as critical.
-- **Auto-lock at contest end:** commit/push/pull/branch are all blocked once the contest ends. The repo becomes read-only and shows a timeline page built from commit data. The timeline is a writeup *reference/hint*, not a generated writeup.
-- **Encryption at rest:** only code and problem files are encrypted, with a password set by the team owner, so a full server compromise does not leak them. Use standard crypto library calls and never invent schemes. Idea under consideration: store no password or hash, and authenticate by decrypting with the submitted password and checking for a known signature (e.g. the title).
-- **Organizer monitoring dashboard:** live view of team progress per problem during the contest.
+- **Team isolation:** a team can access only its own workspace. Check team membership on every API request and every WebSocket message (also check Origin). Any authz gap is critical, since isolation is the main selling point.
+- **Auto-lock at contest end:** all writes are blocked. A scheduler (10 min) marks workspaces locked, and every write request also checks the end time to cover the gap. Locking also drops the master-key cache, cancels pending requests, and closes sockets. The end time can be extended until the post-contest access window closes.
+- **Encryption:** only file contents and memos are encrypted; file paths and edit-history metadata stay plaintext (the timeline and dashboard are built without keys). Team data: master key derived from the leader's workspace password via Argon2id, never stored; the DB holds a salt and a verification value (fixed phrase encrypted with the key, AES-256-GCM, so the GCM tag check is the password check). The key is cached in Redis tied to the login session (TTL 3 days), and the browser only gets an opaque session cookie. Problem files use one server-generated key per CTF. **The workspace password cannot be reset or recovered**, by design. Use standard crypto libraries; never invent schemes.
+- Until the leader sets the workspace password, all file APIs must be blocked explicitly.
 
-MVP: isolated workspaces, IDOR hardening, server-side encryption, auto-lock, timeline page, repo browser + diff viewer, organizer dashboard. Optional: real-time collaborative editor (via an existing CRDT library). Roadmap only: AI summaries.
+Stack decided in README: React + TypeScript, Spring Boot, MySQL, Redis (session/master-key cache), Argon2id, WebSocket.
 
-Undecided (don't assume): git engine (existing OSS vs custom), web-only vs also supporting terminal git, per-contest one-off deployment vs hosted service, whether the dashboard is MVP.
+Still undecided (don't assume): pricing model. Check README "아직 안 정한 것" for the current list.
 
-## Stack
+## Stack (this repo)
 
-- Spring Boot 4.0.x, Gradle (Groovy DSL), Java 17 toolchain
+- Spring Boot 4.0.x, Gradle (Groovy DSL), Java 17 toolchain. Base package: `com.flagwith.flagwith`. Config in `src/main/resources/application.yaml`.
 - Spring Web MVC, Spring Data JPA, MySQL (`mysql-connector-j`), Lombok
-- Mixed Java/Kotlin backend: the Kotlin JVM + `kotlin.plugin.spring` plugins are applied, so `src/main/kotlin` compiles alongside `src/main/java`. One backend dev (the repo owner) writes Kotlin; the other two write Java. When helping the owner, default to Kotlin, and keep code interoperable with Java callers (e.g. `@JvmStatic`, avoid Kotlin-only APIs at module boundaries).
+- Mixed Java/Kotlin backend. Kotlin 2.2.21 (Spring Boot 4's baseline; 1.9.x is incompatible) with the `spring` and `jpa` plugins, so `src/main/kotlin` compiles alongside `src/main/java`. `plugin.jpa` generates no-arg constructors but does not open entity classes; add `allOpen` for `@Entity` if lazy proxies are needed.
+- The repo owner (one of three backend devs) writes Kotlin; the other two write Java. When helping the owner, default to Kotlin and keep code interoperable with Java callers. Lombok output is invisible to Kotlin, so avoid Lombok-generated types at Java/Kotlin boundaries.
 
 ## Team
 
 Security 2, Front-end 1, Back-end 3. Security designs the data-protection and access-control architecture from the start, and it drives the backend and frontend structure.
-- Base package: `com.flagwith.flagwith`. Config in `src/main/resources/application.yaml`.
 
 ## Commands
 
@@ -45,3 +52,7 @@ Security 2, Front-end 1, Back-end 3. Security designs the data-protection and ac
 
 - JPA + MySQL driver are on the classpath but `application.yaml` has no `spring.datasource.*`. `bootRun` and `@SpringBootTest` (`contextLoads`) will fail to start until a datasource is configured (or tests get a test-scoped DB).
 - Spring Boot 4 splits test starters per module (`spring-boot-starter-data-jpa-test`, `spring-boot-starter-webmvc-test`); add matching test starters when adding new starters.
+
+## Keeping this file current
+
+When a change affects what is written above, update this file in the same change; don't wait to be asked. Triggers: `README.md` changes a product decision or an undecided item; a stack, dependency, plugin, or version change in `build.gradle`; a new module, package layout, or convention; commands or config that change how to build, run, or test; a Gotcha gets fixed or a new one is found; team or role changes. After `git pull`/rebase, check whether `README.md` changed and reconcile. Edit the affected lines instead of appending, delete anything that became false, and don't copy README text wholesale — summarize only what affects code.
