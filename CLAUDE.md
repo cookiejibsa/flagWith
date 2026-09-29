@@ -66,7 +66,7 @@ docker compose up -d                  # local MySQL + Redis
 
 ## Gotchas
 
-- Local run needs MySQL (and Redis, once used): `docker compose up -d` starts both with the dev defaults that `application.yaml` reads (`DB_URL`/`DB_USERNAME`/`DB_PASSWORD` env vars override). Tests need no external services: the `test` profile (`src/test/resources/application-test.yaml`, activated by `build.gradle`) points at in-memory H2 (MySQL mode); do not add a test `application.yaml`, it would shadow the main one, so MySQL-specific SQL is not covered by tests.
+- Local run needs MySQL (and Redis, once used): `docker compose up -d` starts both with the dev defaults that `application.yaml` reads (`DB_URL`/`DB_USERNAME`/`DB_PASSWORD` env vars override). Tests need no external services: the `test` profile (`src/test/resources/application-test.yaml`, activated by `build.gradle`) points at in-memory H2 (MySQL mode); MySQL-specific SQL is therefore not covered by tests. Do not add a test `application.yaml`; it would shadow the main one.
 - Spring Boot 4 splits test starters per module (`spring-boot-starter-data-jpa-test`, `spring-boot-starter-webmvc-test`); add matching test starters when adding new starters.
 
 ## Keeping this file current
