@@ -5,6 +5,7 @@ plugins {
     id 'org.jetbrains.kotlin.jvm' version '2.2.21'
     id 'org.jetbrains.kotlin.plugin.spring' version '2.2.21'
     id 'org.jetbrains.kotlin.plugin.jpa' version '2.2.21'
+    id "org.jetbrains.kotlin.plugin.lombok" version '2.2.21'
 }
 
 group = 'com.flagwith'
@@ -43,6 +44,7 @@ dependencies {
     testRuntimeOnly 'com.h2database:h2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test'
 }
 
 kotlin {
