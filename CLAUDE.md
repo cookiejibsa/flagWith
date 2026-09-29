@@ -32,7 +32,7 @@ Still undecided (don't assume): pricing model. Check README "아직 안 정한 �
 - Spring Boot 4.0.x, Gradle (Groovy DSL), Java 17 toolchain. Base package: `com.flagwith.flagwith`. Config in `src/main/resources/application.yaml`.
 - Spring Web MVC, WebSocket, Validation, Spring Data JPA, Spring Data Redis, MySQL (`mysql-connector-j`), Lombok
 - Argon2id via BouncyCastle (`bcprov`, `Argon2BytesGenerator`) because the master key needs raw KDF bytes, which Spring Security's `Argon2PasswordEncoder` (encoded-hash output) does not give. Auth/session library (Spring Security, Spring Session) is not chosen yet.
-- Package layout is layered (by tier: controller / service / repository / entity, not by domain). Exact sub-package names and where shared response/error types live are not fixed yet.
+- Package layout is layered (by tier: controller / service / repository / entity, not by domain). Shared response/error types live in `global/response` (`ApiResponse`, `ErrorResponse`) and `global/exception` (`ErrorCode`, `BusinessException`, `GlobalExceptionHandler`); throw `BusinessException(ErrorCode.X)` from services. Other sub-package names are not fixed yet.
 - Mixed Java/Kotlin backend. Kotlin 2.2.21 (Spring Boot 4's baseline; 1.9.x is incompatible) with the `spring` and `jpa` plugins, so `src/main/kotlin` compiles alongside `src/main/java`. `plugin.jpa` generates no-arg constructors but does not open entity classes; add `allOpen` for `@Entity` if lazy proxies are needed.
 - The repo owner (one of three backend devs) writes Kotlin; the other two write Java. When helping the owner, default to Kotlin and keep code interoperable with Java callers. Lombok output is invisible to Kotlin, so avoid Lombok-generated types at Java/Kotlin boundaries.
 
@@ -66,7 +66,7 @@ docker compose up -d                  # local MySQL + Redis
 
 ## Gotchas
 
-- Local run needs MySQL (and Redis, once used): `docker compose up -d` starts both with the dev defaults that `application.yaml` reads (`DB_URL`/`DB_USERNAME`/`DB_PASSWORD` env vars override). Tests need no external services: `src/test/resources/application.yaml` points at in-memory H2 (MySQL mode), so MySQL-specific SQL is not covered by tests.
+- Local run needs MySQL (and Redis, once used): `docker compose up -d` starts both with the dev defaults that `application.yaml` reads (`DB_URL`/`DB_USERNAME`/`DB_PASSWORD` env vars override). Tests need no external services: the `test` profile (`src/test/resources/application-test.yaml`, activated by `build.gradle`) points at in-memory H2 (MySQL mode); do not add a test `application.yaml`, it would shadow the main one, so MySQL-specific SQL is not covered by tests.
 - Spring Boot 4 splits test starters per module (`spring-boot-starter-data-jpa-test`, `spring-boot-starter-webmvc-test`); add matching test starters when adding new starters.
 
 ## Keeping this file current
