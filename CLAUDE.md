@@ -34,6 +34,19 @@ Still undecided (don't assume): pricing model. Check README "아직 안 정한 �
 - Mixed Java/Kotlin backend. Kotlin 2.2.21 (Spring Boot 4's baseline; 1.9.x is incompatible) with the `spring` and `jpa` plugins, so `src/main/kotlin` compiles alongside `src/main/java`. `plugin.jpa` generates no-arg constructors but does not open entity classes; add `allOpen` for `@Entity` if lazy proxies are needed.
 - The repo owner (one of three backend devs) writes Kotlin; the other two write Java. When helping the owner, default to Kotlin and keep code interoperable with Java callers. Lombok output is invisible to Kotlin, so avoid Lombok-generated types at Java/Kotlin boundaries.
 
+## API conventions
+
+Full spec and examples are in README "API 응답 규칙". Summary:
+- Code is camelCase (mandatory); JSON (requests and responses) is snake_case.
+- Two response shapes. Success: `{success: true, message, data}`. Error: `{success: false, error_code, message}`. `data` is always present, `null` when empty.
+- Use real HTTP status codes (400/401/403/404/409...), not 200 for everything.
+- `error_code` is UPPER_SNAKE with a domain prefix (`AUTH_FAILED`, `TEAM_NOT_FOUND`), kept in one place.
+- Validation failure: `error_code` `VALIDATION_FAILED` plus `errors: [{field, message}]`. `errors` exists only on validation failures; omit the field otherwise (`@JsonInclude(NON_NULL)`).
+- Lists: `data: {items, page, size, total_count}`, `page` starts at 1 (Spring `Page` is 0-based, add 1).
+- Dates: ISO 8601 with offset (`2026-09-29T10:30:00+09:00`). Use `OffsetDateTime`; `LocalDateTime` drops the offset.
+- Login failure uses one message for unknown email and wrong password, to avoid account enumeration.
+- Not decided: how null optional fields (e.g. `deleted_at`) are serialized.
+
 ## Team
 
 Security 2, Front-end 1, Back-end 3. Security designs the data-protection and access-control architecture from the start, and it drives the backend and frontend structure.
